@@ -24,6 +24,15 @@ type Zone interface {
 	Records(q dns.Question) []dns.RR
 }
 
+// Announcer is an optional interface for a Zone to list the records the server
+// announces when it starts and withdraws when it shuts down (RFC 6762 sections
+// 8.3 and 10.1). For a Zone that does not implement it the server looks the
+// records up with DNS-SD questions under the "local." domain.
+type Announcer interface {
+	// Announcements returns every record of the zone, without duplicates.
+	Announcements() []dns.RR
+}
+
 // MDNSService is used to export a named service by implementing a Zone
 type MDNSService struct {
 	Instance string   // Instance name (e.g. "hostService name")
@@ -153,6 +162,13 @@ func (m *MDNSService) Records(q dns.Question) []dns.RR {
 	default:
 		return nil
 	}
+}
+
+// Announcements returns every record of the service: the service type
+// enumeration PTR, the service PTR, and the instance's SRV, A, AAAA and TXT.
+func (m *MDNSService) Announcements() []dns.RR {
+	recs := m.serviceEnum(dns.Question{Name: m.enumAddr, Qtype: dns.TypePTR})
+	return append(recs, m.serviceRecords(dns.Question{Name: m.serviceAddr, Qtype: dns.TypePTR})...)
 }
 
 func (m *MDNSService) serviceEnum(q dns.Question) []dns.RR {
